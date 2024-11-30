@@ -1,0 +1,208 @@
+---
+title: "US CBP Encounter Data"
+subtitle: "Tidy Tuesday Week 48"
+author: "Ian Milko"
+date: last-modified
+format:
+    html:
+        toc: true
+        toc-location: right
+        code-fold: true
+        theme: flatly
+        self-contained: true
+        echo: true
+---
+
+```{r setup}
+#| include: false
+
+library(tidyverse)
+library(cowplot)
+library(janitor)
+library(scales)
+library(readxl)
+library(ggthemes)
+
+knitr::opts_chunk$set(
+    warning = FALSE,
+    message = FALSE,
+    comment = "#>",
+    fig.path = "figs/",
+    fig.width = 16,
+    fig.height = 9,
+    fig.retina = 3
+)
+
+tuesdata <- tidytuesdayR::tt_load(2024, week = 48)
+
+pop_est <- read_xlsx(here::here('pop_est.xlsx'), range = "A4:F60") %>%
+    clean_names() %>%
+    slice(6:56) %>%
+    rename(
+        state = x1,
+        apr2020 = x2,
+    ) %>%
+    select(-apr2020) %>%
+    mutate(state = str_replace(state, ".", "")) %>%
+    pivot_longer(
+        cols = starts_with("x"),
+        names_to = "year",
+        values_to = "pop"
+    ) %>%
+    mutate(year = str_replace(year, "x","") %>% as.integer())
+glimpse(pop_est)
+
+# glimpse(tuesdata)
+cbp_resp <- tuesdata$cbp_resp
+cbp_state <- tuesdata$cbp_state %>%
+    rename(
+        region = land_border_region,
+        auth = title_of_authority,
+        encs = encounter_count,
+        year = fiscal_year
+    )
+# glimpse(cbp_resp)
+glimpse(cbp_state)
+
+```
+
+```{r exploring}
+
+ma_totals <- cbp_state %>%
+    filter(state == "MA") %>%
+    group_by(year) %>%
+    summarize(tot_encs = sum(encs)) %>%
+    ggplot() +
+    geom_col(aes(x = year, y = tot_encs)) +
+    theme_minimal_hgrid()
+# ma_totals
+
+northern_tots <- cbp_state %>%
+    filter(region == "Northern Land Border") %>%
+    group_by(year) %>%
+    summarize(tot_encs = sum(encs)) %>%
+    ggplot() +
+    geom_col(aes(x = year, y = tot_encs)) +
+    theme_minimal_hgrid()
+# northern_tots
+
+north_states_2023 <- cbp_state %>%
+    filter(region == "Northern Land Border" & year == 2023) %>%
+    group_by(state) %>%
+    summarize(tot_encs = sum(encs)) %>%
+    ggplot() +
+    geom_col(aes(x = state, y = tot_encs)) +
+    theme_minimal_hgrid()
+# north_states_2023
+
+```
+
+```{r percent-encounters-north}
+
+pop_est_2023 <- pop_est %>%
+    filter(year == 2023) %>%
+    mutate(state = state.abb[match(state, state.name)])
+# pop_est_2023
+
+north_states_percent <- cbp_state %>%
+    filter(region == "Northern Land Border") %>%
+    group_by(state) %>%
+    summarize(tot_encs = sum(encs)) %>%
+    left_join(pop_est_2023, by = join_by("state")) %>%
+    filter(!is.na(pop)) %>%
+    mutate(enc_ratio = (tot_encs / pop)) %>%
+    ggplot() +
+    geom_col(aes(x = state, y = enc_ratio), fill = "steelblue") +
+    scale_y_continuous(labels = scales::percent, limits = c(0, 0.3)) +
+    labs(
+        x = "State",
+        y = "Percent of Population",
+        title = "Border Encounters in Northern Border States",
+        subtitle = "Amount of border encounters by percentage of that state's population, 2023"
+        ) +
+    theme_wsj()
+north_states_percent
+
+```
+
+```{r percent-encounters-south}
+
+south_states_percent <- cbp_state %>%
+    filter(region == "Southwest Land Border") %>%
+    group_by(state) %>%
+    summarize(tot_encs = sum(encs)) %>%
+    left_join(pop_est_2023, by = join_by("state")) %>%
+    filter(!is.na(pop)) %>%
+    mutate(enc_ratio = (tot_encs / pop)) %>%
+    ggplot() +
+    geom_col(aes(x = state, y = enc_ratio), fill = "steelblue") +
+    scale_y_continuous(labels = scales::percent, limits = c(0, 0.3)) +
+    labs(
+        x = "State",
+        y = "Percent of Population",
+        title = "Border Encounters in Southwest Border States",
+        subtitle = "Amount of border encounters by percentage of that state's population, 2023"
+        ) +
+    theme_wsj()
+south_states_percent
+
+
+```
+
+```{r percent-encounters}
+
+state_regions <- cbp_state %>%
+    select(c(state, region)) %>%
+    filter(region != "Other") %>%
+    unique() %>%
+    mutate(region = str_split_i(region, " ", 1))
+# state_regions
+
+states_percent <- cbp_state %>%
+    filter(region != "Other") %>%
+    group_by(state) %>%
+    summarize(tot_encs = sum(encs)) %>%
+    left_join(pop_est_2023, by = join_by("state")) %>%
+    left_join(state_regions, by = join_by("state")) %>%
+    filter(!is.na(pop)) %>%
+    mutate(enc_ratio = (tot_encs / pop)) %>%
+    ggplot() +
+    geom_col(aes(x = reorder(state, desc(enc_ratio)), y = enc_ratio, fill = region)) +
+    scale_y_continuous(labels = scales::percent, limits = c(0, 0.3)) +
+    scale_fill_manual(values = c("Northern" = "steelblue3", "Southwest" = "tomato3")) +
+    labs(
+        x = "State",
+        y = "Percent of Population",
+        title = "Border Encounters in Border States",
+        subtitle = "Amount of border encounters by percentage of that state's population, 2023",
+        fill = "Region",
+        caption = "Sources: US Census Bureau; US Customs and Border Patrol"
+        ) +
+    theme_wsj() +
+    theme(legend.position = c(0.7, 0.8),
+        legend.text = element_text(size = 16, family = "mono", lineheight = rel(14)),
+        legend.direction = "vertical",
+        legend.spacing.y = unit(10, "points")
+    )
+states_percent
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -35,7 +35,7 @@ knitr::opts_chunk$set(
 
 tuesdata <- tidytuesdayR::tt_load(2024, week = 48)
 
-pop_est <- read_xlsx(here::here('pop_est.xlsx'), range = "A4:F60") %>%
+pop_est <- read_xlsx(here::here('week48', 'pop_est.xlsx'), range = "A4:F60") %>%
     clean_names() %>%
     slice(6:56) %>%
     rename(
@@ -167,14 +167,20 @@ states_percent <- cbp_state %>%
     filter(!is.na(pop)) %>%
     mutate(enc_ratio = (tot_encs / pop)) %>%
     ggplot() +
-    geom_col(aes(x = reorder(state, desc(enc_ratio)), y = enc_ratio, fill = region)) +
+    geom_col(
+        aes(
+            x = reorder(state, desc(enc_ratio)),
+            y = enc_ratio,
+            fill = region
+        )
+        ) +
     scale_y_continuous(labels = scales::percent, limits = c(0, 0.3)) +
     scale_fill_manual(values = c("Northern" = "steelblue3", "Southwest" = "tomato3")) +
     labs(
         x = "State",
-        y = "Percent of Population",
-        title = "Border Encounters in Border States",
-        subtitle = "Amount of border encounters by percentage of that state's population, 2023",
+        y = "Border Encounters (% of pop.)",
+        title = "New Neighbors",
+        subtitle = "Southern states see more border encounters relative to their populations.",
         fill = "Region",
         caption = "Sources: US Census Bureau; US Customs and Border Patrol"
         ) +
@@ -182,27 +188,13 @@ states_percent <- cbp_state %>%
     theme(legend.position = c(0.7, 0.8),
         legend.text = element_text(size = 16, family = "mono", lineheight = rel(14)),
         legend.direction = "vertical",
-        legend.spacing.y = unit(10, "points")
+        legend.spacing.y = unit(10, "points"),
+        axis.title = element_text(size = 16, face = 'bold'),
+        plot.caption = element_text(size = 14)
     )
-states_percent
+    states_percent
 
 
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

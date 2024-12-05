@@ -1,0 +1,70 @@
+---
+title: "Week 49"
+author: "Ian Milko"
+date: last-modified
+format:
+    html:
+        toc: true
+        toc-location: "right"
+        code-fold: true
+        theme: flatly
+        self-contained: true
+        echo: true
+---
+
+
+```{r setup}
+
+library(tidyverse)
+library(janitor)
+library(cowplot)
+library(lubridate)
+library(ggthemes)
+
+knitr::opts_chunk$set(
+    warning = FALSE,
+    message = FALSE,
+    comment = "#>",
+    fig.path = "figs/",
+    fig.width = 16,
+    fig.height = 9,
+    fig.retina = 3
+)
+
+tuesdata <- tidytuesdayR::tt_load(2024, week = 49)
+
+traffic <- tuesdata$A64_traffic %>%
+    clean_names()
+glimpse(traffic)
+
+```
+
+```{r explore}
+
+traffic <- traffic %>%
+    mutate(weekday = wday(report_date)) %>%
+    mutate(is_wkday = ifelse(weekday <= 5, "Weekday", "Weekend")) %>%
+    mutate(wkday_name = weekdays(report_date, abbreviate = FALSE)) %>%
+    mutate(wkday_name = factor(wkday_name, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")))
+glimpse(traffic)
+
+traffic %>%
+    filter(!is.na(avg_mph)) %>%
+    group_by(wkday_name) %>%
+    summarise(avg = mean(avg_mph)) %>%
+    ggplot() +
+    geom_col(aes(x = wkday_name, y = avg)) +
+    labs(
+        x = "Day of Week",
+        y = "Average speed",
+        title = "Average Traffic Speed by Day of Week"
+        ) +
+    theme_wsj() +
+    theme(
+        axis.title = element_text(size = 16, face = 'bold')
+    )
+
+
+
+```
+
